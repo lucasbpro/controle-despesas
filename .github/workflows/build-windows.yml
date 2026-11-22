@@ -1,0 +1,23 @@
+name: Build Windows .exe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+      - name: Gerar executável
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name ControleDespesas --icon icone.ico --add-data "icone.ico;." --add-data "icone.png;." controle_despesas.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ControleDespesas
+          path: dist/ControleDespesas.exe
