@@ -237,6 +237,81 @@ def agrupar_lancamentos(lancs):
     return grupos
 
 
+NOME_CATEGORIA_PLANILHA = {"fixas": "Fixa", "variaveis": "Variável", "adicionais": "Adicional"}
+
+TEXTO_FORMATO = """A planilha pode ser um arquivo Excel (.xlsx) ou CSV (.csv).
+
+Cada linha é uma despesa, com 4 colunas:
+
+  Data        Data da despesa. Ex.: 15/03/2026, 2026-03-15,
+              03/2026 ou mar/2026. Só o mês e o ano são usados.
+  Categoria   Fixa, Variável ou Adicional (o plural e "Extra"
+              também valem; maiúsculas e acentos não importam).
+  Descrição   Nome da despesa. Ex.: Condomínio, Uber, Doações.
+  Valor       Valor em reais. Ex.: 1234,56 ou R$ 1.234,56.
+
+Exemplo:
+
+  Data         Categoria   Descrição           Valor
+  05/01/2026   Fixa        Condomínio          506,59
+  12/01/2026   Variável    Cartão de Crédito   4.045,60
+  20/01/2026   Adicional   Doações             68,00
+
+Regras:
+  • A primeira linha deve ser o cabeçalho com os nomes das colunas
+    (em qualquer ordem). Sem cabeçalho, use a ordem acima.
+  • Colunas a mais (ex.: Observação) são ignoradas.
+  • Despesas com a mesma descrição no mesmo mês e categoria são
+    somadas.
+  • Linhas com erro são listadas e ignoradas; antes de gravar você
+    vê uma prévia e decide se substitui ou soma valores que já
+    existem no histórico.
+  • Um arquivo gerado em "Exportar histórico" pode ser importado
+    de volta."""
+
+
+def exportar_historico(db, caminho):
+    """Exporta todas as despesas (formato de importação) e um resumo mensal."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill
+    wb = openpyxl.Workbook()
+    cab_font, cab_fill = Font(bold=True, color="FFFFFF"), PatternFill("solid", fgColor="2E7D5B")
+
+    ws = wb.active
+    ws.title = "Despesas"
+    ws.append(["Data", "Categoria", "Descrição", "Valor", "Observação"])
+    ordem = {c: i for i, (c, _, _) in enumerate(CATEGORIAS)}
+    linhas = db.con.execute(
+        "SELECT ano, mes, categoria, descricao, valor, observacao FROM despesas").fetchall()
+    linhas.sort(key=lambda r: (r[0], r[1], ordem.get(r[2], 9), r[3].lower()))
+    for ano, mes, cat, desc, valor, obs in linhas:
+        ws.append([dt.date(ano, mes, 1), NOME_CATEGORIA_PLANILHA.get(cat, cat), desc, valor, obs or ""])
+    for row in ws.iter_rows(min_row=2):
+        row[0].number_format = "DD/MM/YYYY"
+        row[3].number_format = "#,##0.00"
+    for col, w in zip("ABCDE", (14, 14, 34, 14, 30)):
+        ws.column_dimensions[col].width = w
+
+    ws2 = wb.create_sheet("Resumo mensal")
+    ws2.append(["Mês/Ano", "Fixas", "Variáveis", "Adicionais", "Total", "Salário líquido", "Saldo"])
+    for h in db.historico():
+        ws2.append([dt.date(h["ano"], h["mes"], 1), h["fixas"], h["variaveis"], h["adicionais"],
+                    h["total"], h["salario"], h["saldo"]])
+    for row in ws2.iter_rows(min_row=2):
+        row[0].number_format = "MM/YYYY"
+        for c in row[1:]:
+            c.number_format = "#,##0.00"
+    for col in "ABCDEFG":
+        ws2.column_dimensions[col].width = 16
+
+    for w in (ws, ws2):
+        for c in w[1]:
+            c.font, c.fill = cab_font, cab_fill
+        w.freeze_panes = "A2"
+    wb.save(caminho)
+    return len(linhas)
+
+
 def salvar_modelo(caminho):
     import openpyxl
     from openpyxl.styles import Font, PatternFill
@@ -862,9 +937,10 @@ class App(tk.Tk):
         ttk.Button(barra, text="▶", width=3, command=lambda: self.mover(1)).pack(side="left")
         ttk.Button(barra, text="Hoje", command=lambda: self.definir_periodo(hoje.year, hoje.month)).pack(
             side="left", padx=6)
-        ttk.Button(barra, text="Importar planilha...", command=self.importar_planilha).pack(
-            side="left", padx=(18, 4))
-        ttk.Button(barra, text="Salvar modelo de planilha...", command=self.salvar_modelo).pack(side="left")
+        ttk.Button(barra, text="Importar dados", command=self.importar_planilha).pack(
+            side="left", padx=(18, 0))
+        ttk.Button(barra, text="ⓘ", width=3, command=self.ajuda_importacao).pack(side="left", padx=(2, 8))
+        ttk.Button(barra, text="Exportar histórico", command=self.exportar_historico).pack(side="left")
         ttk.Label(barra, text=f"Banco: {self.db.caminho}", foreground="#888888").pack(side="right")
         self.cb_mes.bind("<<ComboboxSelected>>", lambda e: self.atualizar_tudo())
         self.sp_ano.bind("<Return>", lambda e: self.atualizar_tudo())
@@ -925,9 +1001,51 @@ class App(tk.Tk):
             return
         JanelaImportacao(self, caminho, agrupar_lancamentos(lancs), lancs, erros)
 
-    def salvar_modelo(self):
+    def ajuda_importacao(self):
+        janela = tk.Toplevel(self)
+        janela.title("Formato da planilha de importação")
+        janela.transient(self)
+        janela.resizable(False, False)
+        self.aplicar_icone(janela)
+        f = ttk.Frame(janela, padding=14)
+        f.pack(fill="both", expand=True)
+        ttk.Label(f, text="Como montar a planilha para importar", style="Titulo.TLabel").pack(anchor="w")
+        caixa = tk.Text(f, width=70, height=30, wrap="none", relief="flat",
+                        font=("Consolas", 10) if sys.platform.startswith("win") else ("DejaVu Sans Mono", 9),
+                        background=janela.cget("background"))
+        caixa.insert("1.0", TEXTO_FORMATO)
+        caixa.config(state="disabled")
+        caixa.pack(pady=(8, 8))
+        bts = ttk.Frame(f)
+        bts.pack(fill="x")
+        ttk.Button(bts, text="Fechar", command=janela.destroy).pack(side="right")
+        ttk.Button(bts, text="Salvar planilha modelo...",
+                   command=lambda: self.salvar_modelo(janela)).pack(side="right", padx=6)
+        janela.bind("<Escape>", lambda e: janela.destroy())
+        janela.grab_set()
+        janela.focus_set()
+
+    def exportar_historico(self):
+        if not self.db.con.execute("SELECT 1 FROM despesas LIMIT 1").fetchone():
+            messagebox.showinfo(APP_NAME, "Ainda não há despesas no histórico para exportar.")
+            return
         caminho = filedialog.asksaveasfilename(
-            parent=self, title="Salvar modelo de planilha", defaultextension=".xlsx",
+            parent=self, title="Exportar histórico", defaultextension=".xlsx",
+            initialfile=f"historico-despesas-{dt.date.today():%Y-%m-%d}.xlsx",
+            filetypes=[("Excel", "*.xlsx")])
+        if not caminho:
+            return
+        try:
+            n = exportar_historico(self.db, caminho)
+        except OSError as e:
+            messagebox.showerror(APP_NAME, f"Não foi possível salvar (o arquivo está aberto no Excel?):\n{e}")
+            return
+        messagebox.showinfo(APP_NAME, f"{n} despesa(s) exportada(s) para:\n{caminho}\n\n"
+                                      "A aba \"Resumo mensal\" traz os totais, o salário e o saldo de cada mês.")
+
+    def salvar_modelo(self, parent=None):
+        caminho = filedialog.asksaveasfilename(
+            parent=parent or self, title="Salvar planilha modelo", defaultextension=".xlsx",
             initialfile="modelo-importacao-despesas.xlsx", filetypes=[("Excel", "*.xlsx")])
         if caminho:
             try:

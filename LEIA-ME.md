@@ -32,7 +32,7 @@ O ícone do app (`icone.ico`) é aplicado automaticamente ao `.exe` e às janela
 
 ## Importar despesas de uma planilha
 
-Clique em **Importar planilha...** no topo e escolha um arquivo `.xlsx` ou `.csv` com as colunas:
+Clique em **Importar dados** no topo (o botão **ⓘ** ao lado explica o formato) e escolha um arquivo `.xlsx` ou `.csv` com as colunas:
 
 | Data | Categoria | Descrição | Valor |
 |---|---|---|---|
@@ -47,8 +47,14 @@ Clique em **Importar planilha...** no topo e escolha um arquivo `.xlsx` ou `.csv
 - Lançamentos com a mesma descrição no mesmo mês e categoria são somados (ex.: várias corridas de Uber).
 - Antes de gravar, uma janela mostra a prévia, as linhas com problema (que serão ignoradas) e, se já houver
   lançamentos iguais no banco, deixa escolher entre **substituir** ou **somar** os valores.
-- O botão **Salvar modelo de planilha...** gera um arquivo de exemplo pronto para preencher
+- Na janela do **ⓘ**, o botão **Salvar planilha modelo...** gera um arquivo de exemplo pronto para preencher
   (também incluído aqui como `modelo-importacao-despesas.xlsx`).
+
+## Exportar o histórico
+
+**Exportar histórico** salva um `.xlsx` com duas abas: **Despesas** (todas as despesas, no mesmo formato da
+importação, mais a observação) e **Resumo mensal** (totais por categoria, salário e saldo de cada mês).
+O arquivo pode ser importado de volta, por exemplo para levar os dados para outro computador.
 
 ## Onde ficam os dados
 
