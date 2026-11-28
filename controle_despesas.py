@@ -29,7 +29,7 @@ MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set",
 CATEGORIAS = [
     ("fixas", "Despesas Fixas", "#2a78d6"),
     ("variaveis", "Despesas Variáveis", "#e8862a"),
-    ("adicionais", "Despesas Adicionais", "#8a4fd0"),
+    ("adicionais", "Despesas Adicionais/Extras", "#8a4fd0"),
 ]
 COR_TOTAL = "#c43c3c"
 COR_SALARIO = "#2e9e5b"
@@ -680,7 +680,7 @@ class AbaResumo(ttk.Frame):
         hist = ttk.LabelFrame(self, text="Histórico mensal", padding=6)
         hist.pack(fill="both", expand=True, pady=(10, 0))
         cols = ("periodo", "fixas", "variaveis", "adicionais", "total", "salario", "saldo")
-        nomes = ("Mês/Ano", "Fixas", "Variáveis", "Adicionais", "Total", "Salário", "Saldo")
+        nomes = ("Mês/Ano", "Fixas", "Variáveis", "Adicionais/Extras", "Total", "Salário", "Saldo")
         self.tabela = ttk.Treeview(hist, columns=cols, show="headings", height=7)
         for c, n in zip(cols, nomes):
             self.tabela.heading(c, text=n)
